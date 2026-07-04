@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>AI PR Reviewer — Status</title>
+
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap"
+            rel="stylesheet"
+        />
+
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        colors: {
+                            board: {
+                                bg: "#0B0D12",
+                                surface: "#14171D",
+                                border: "#232838",
+                                text: "#E7E9EE",
+                                muted: "#7A8194",
+                                amber: "#F0A93B",
+                            },
+                            status: {
+                                pending: "#F0A93B",
+                                processing: "#4C9FE8",
+                                done: "#37C871",
+                                failed: "#EF5A66",
+                            },
+                        },
+                        fontFamily: {
+                            display: ["Space Grotesk", "sans-serif"],
+                            mono: ["IBM Plex Mono", "monospace"],
+                            sans: ["Inter", "sans-serif"],
+                        },
+                    },
+                },
+            };
+        </script>
+
+        <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+        <style>
+            .flap-tile {
+                position: relative;
+                transition:
+                    background-color 250ms ease,
+                    border-color 250ms ease,
+                    color 250ms ease;
+            }
+            .flap-tile::after {
+                content: "";
+                position: absolute;
+                left: 0.4rem;
+                right: 0.4rem;
+                top: 50%;
+                height: 1px;
+                background: currentColor;
+                opacity: 0.25;
+                pointer-events: none;
+            }
+            .stat-count {
+                transition: color 200ms ease;
+            }
+            @media (prefers-reduced-motion: reduce) {
+                .animate-pulse {
+                    animation: none;
+                }
+            }
+            :focus-visible {
+                outline: 2px solid #f0a93b;
+                outline-offset: 2px;
+            }
+        </style>
+    </head>
+    <body
+        class="bg-board-bg text-board-text font-sans antialiased min-h-screen"
+    >
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+            <!-- Header -->
+            <header class="mb-8">
+                <div class="flex items-baseline gap-2">
+                    <span class="text-board-amber font-mono">◆</span>
+                    <h1
+                        class="font-display font-bold text-lg sm:text-xl tracking-wide uppercase"
+                    >
+                        AI PR Reviewer
+                    </h1>
+                </div>
+                <p class="text-board-muted text-sm mt-1 font-mono">
+                    autonomous review queue — live
+                </p>
+
+                <!-- Stats strip, updated via htmx out-of-band swap -->
+                <div id="stats-strip" class="flex flex-wrap gap-3 mt-5">
+                    <span
+                        class="px-3 py-1.5 rounded bg-board-surface border border-board-border text-xs font-mono text-board-muted"
+                    >
+                        PENDING <span class="text-board-amber">—</span>
+                    </span>
+                    <span
+                        class="px-3 py-1.5 rounded bg-board-surface border border-board-border text-xs font-mono text-board-muted"
+                    >
+                        RUNNING <span class="text-status-processing">—</span>
+                    </span>
+                    <span
+                        class="px-3 py-1.5 rounded bg-board-surface border border-board-border text-xs font-mono text-board-muted"
+                    >
+                        TODAY <span class="text-board-text">—</span>
+                    </span>
+                </div>
+            </header>
+
+            <!-- Polling feed -->
+            <main
+                id="review-feed"
+                hx-get="/dashboard/rows"
+                hx-trigger="load, every 3s"
+                hx-swap="innerHTML"
+                class="rounded-lg border border-board-border bg-board-surface overflow-hidden"
+            >
+                <div class="p-6 text-board-muted text-sm font-mono">
+                    loading queue…
+                </div>
+            </main>
+
+            <footer class="mt-6 text-xs text-board-muted font-mono">
+                polls every 3s · local queue view
+            </footer>
+        </div>
+    </body>
+</html>
