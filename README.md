@@ -58,6 +58,9 @@ Two real failure modes surfaced during development and both are handled explicit
 **Async queue over synchronous webhook handling.**
 The first working version ran the full agent loop inside the webhook handler. This caused GitHub to retry slow requests, risking duplicate reviews. Moving to a queue was a direct fix for a real bug encountered during testing, not a preemptive optimization.
 
+**Rate limiting at the queue boundary, not inside the agent.**
+Each repo is capped at a configurable number of reviews per rolling 24-hour window, checked with a plain `COUNT(*)` against the existing `reviews` table before a job is ever queued. No new schema, no separate rate-limiter service — the data needed already existed, so the check reuses it.
+
 ## Stack
 
 - **Runtime:** Node.js, TypeScript
@@ -66,6 +69,13 @@ The first working version ran the full agent loop inside the webhook handler. Th
 - **Sandbox:** Docker (via `dockerode`)
 - **Queue/DB:** PostgreSQL + Drizzle ORM (`SKIP LOCKED` pattern)
 - **GitHub integration:** Octokit, HMAC-verified webhooks
+- **Dashboard:** htmx + Tailwind (server-rendered, no client build step)
+
+## Live status dashboard
+
+A dashboard at `/dashboard` shows the review queue in real time — polling every 3 seconds via htmx. Each review gets a status tile (`PENDING → PROCESSING → DONE/FAILED`) and a verdict once available; aggregate counts (pending, running, reviewed today) update via an htmx out-of-band swap in the same request that refreshes the table, so the whole page stays in sync in one round trip.
+
+Status tiles keep a stable DOM id across polls, which lets htmx's built-in swap/settle behavior drive a CSS transition only when a review's actual state changes — unchanged rows stay visually still instead of re-rendering every poll. Table layout on desktop, stacked cards on mobile.
 
 ## Example output
 
@@ -82,6 +92,11 @@ On a PR introducing two logic bugs (an inverted discount calculation and inverte
 > <details><summary>Trace (2 steps)</summary>
 > run_tests → assertion failures with exact values → submit_review
 > </details>
+
+On a PR with correct logic (`capitalize` and `isPalindrome` string helpers), the same flow produces:
+
+> **AI Review: PASS**
+> Inlined both functions, wrote assertions covering standard and edge cases, ran them in the sandbox — all passed on the first attempt.
 
 ## Running locally
 
@@ -110,5 +125,6 @@ Requires a `.env` with `DATABASE_URL`, `GROQ_API_KEY`, `GITHUB_TOKEN` (classic P
 ## Known limitations / next steps
 
 - Currently tests single-file diffs; multi-file PRs would need the agent to reason across several inlined modules.
-- No cost/rate guard yet on LLM calls per repo per day — worth adding before pointing this at a busy repo.
 - Sandbox currently supports JS/Node test execution only.
+- Rate limiting is per-repo only; no global daily cap yet across all repos (relevant mainly for protecting shared LLM API quota if this were pointed at many repos at once).
+- Dashboard is read-only — no manual "trigger review" action yet, though the table it reuses would make that a small addition.
