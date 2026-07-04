@@ -8,6 +8,7 @@ import {
 } from "../github/client.js";
 import { db } from "../db/index.js";
 import { reviews } from "../db/schema.js";
+import { isRateLimited } from "../queue/rateLimiter.js";
 
 export async function webhookRoute(app: FastifyInstance) {
   app.post(
@@ -38,11 +39,16 @@ export async function webhookRoute(app: FastifyInstance) {
           repo: payload.repository.name,
           prNumber: payload.pull_request.number,
         };
+
+        const limited = await isRateLimited(owner, repo);
+        if (limited) {
+          return reply.status(429).send({ status: "rate_limited" });
+        }
+
         await db
           .insert(reviews)
           .values({ owner, repo, prNumber, status: "pending" });
 
-        // runReviewAsync(owner, repo, prNumber);
         return reply.status(200).send({ status: "queued" });
       }
 
